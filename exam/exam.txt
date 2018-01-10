@@ -1,0 +1,1113 @@
+dir="D:/RFile/实验"
+setwd(dir)
+file=""
+data<-read.table(file,head=T,sep="\t")
+mydata <- as.data.frame(data)
+head(mydata,10)
+colnames(mydata)
+
+total <- subset(mydata,Class.ID=="0")
+names(mydata)[6] = 'Sum'
+mix_order <- mydata[order(-mydata$Sum),]
+mix_set = mix_order[2:11,3]
+set_u2 <- union(female_set,male_set)交集
+set_i2 <- intersect(female_set,male_set)并集
+P(A|B)=P(B|A)*P(A)/(P(B|A)*P(A)+P(B|~A)p(~A))
+library(gplots)
+venn(list(female_set,male_set))
+library(VennDiagram)
+venn.diagram(list(female=female_set,male=male_set),filename="VennDiagram_2_sets.tiff",lwd=1,lty=2,col=c('red','green'),fill=c('red','green'),cat.col=c('red','green'))
+lenA<-length(female_set)
+lenB<-length(male_set)
+lenAB<-length(intersect(female_set,male_set))
+draw.pairwise.venn(area1=lenA,area2=lenB,cross.area=lenAB,category=c('A','B'),lwd=rep(1,1),lty=rep(2,2),col=c('red','green'),fill=c('red','green'),cat.col=c('red','green'))
+lenA<-length(female_set)
+lenB<-length(male_set)
+lenC<-length(mix_set)
+lenAB<-length(intersect(female_set,male_set))
+lenAB<-length(intersect(female_set,male_set))
+lenAC<-length(intersect(female_set,mix_set))
+lenBC<-length(intersect(male_set,mix_set))
+lenABC<-length(intersect(intersect(female_set,male_set),mix_set))
+venn.diagram(list(set_A=female_set,set_B=male_set,set_C=mix_set),filename="VennDiagram_3_sets.tiff",lwd=1,lty=2,col=c('red','green','blue'),fill=c('red','green','blue'), cat.col=c('red','green','blue'))
+draw.triple.venn(area1=lenA, area2=lenB, area3=lenC,n12=lenAB,n23=lenBC, n13=lenAC, n123=lenABC, category = c('A','B','C') ,col=c('red','green','blue'), fill=c('red','green','blue'),cat.col=c('red','green','blue'), filename="VennDiagram_3_sets2.tiff")
+
+source("http://bioconductor.org/biocLite.R")
+biocLite("GEOquery")
+library(GEOquery)
+gds4794 <- getGEO("GDS4794",destdir=dir)
+
+#抛掷硬币100次，正面向上10次的概率
+dbinom(10,100,0.5)
+#抛掷硬币100次，正面向上不超过10次的概率
+pbinom(10,100,0.5)
+#抛掷硬币100次，正面向上多少次的发生概率是0.4
+qbinom(0.4,100,0.5)
+#从100个样本中 ,以0.4发生概率找出10个随机值
+rbinom(10,100,0.4)
+x <- seq(0,100,by = 1)
+y <- dbinom(x,100,0.7)
+png(file = "dbinom-drug2.png")
+plot(x,y,cex.axis=2,cex.lab=2)
+lines(x,y)
+abline(v=70,lty=3,lwd=2,col="red")
+dev.off()
+
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+mode(gds4794)
+Meta(gds4794)
+data<-Table(gds4794)
+ncol(data)
+nrow(data)
+n=5
+col.name=colnames(data2)
+sam.col.name = sample(col.name,n,replace=F)
+sub.data <- data2[, sam.col.name]
+#计算数据子集的最大、最小值，用作限制横坐标范围
+x1 <- min(sub.data, na.rm=TRUE)
+x2 <- max(sub.data, na.rm=TRUE)
+#定义纵坐标最大值，根据绘图结果自行调整，最小值固定为0
+y_max = 7e-4
+#绘制概率分布图，不同曲线使用不同颜色
+dnorm_png<-png("dnorm.png")
+curve(dnorm(x,mean(sub.data[,1], na.rm=TRUE), sd(sub.data[,1],
+na.rm=TRUE)), xlim=c(x1,x2), ylim=c(0,y_max), col=rev(rainbow(1)),
+lwd=3)
+for (i in 2:ncol(sub.data))
+{
+curve(dnorm(x,mean(sub.data[,i], na.rm=TRUE), sd(sub.data[,i],
+na.rm=TRUE)), add=TRUE , xlim=c(x1,x2), ylim=c(0,y_max),
+col=rev(rainbow(i)), lwd=3)
+}
+#保存图片
+dev.off()
+
+a<- sub.data[,1]
+#频率频率直方图, 分100个bins
+#count图
+png(file = "gds4794-hist1.png")
+hist(a, freq = T, breaks = 100)
+dev.off()
+#Frequency图
+png(file = "gds4794-hist2.png")
+hist(a, freq = F, breaks = 100)
+dev.off()
+
+#随机抽样1次
+png(file = "gds4794-hist-sample1.png")
+hist(a[sample(a, 100)], freq = F, breaks = 100)
+dev.off()
+#重复抽样100次
+png(file = "gds4794-hist-sample100.png")
+x <- replicate(100, sample(a, size=100, replace = FALSE))
+hist(x, freq = F, breaks = 100)
+dev.off()
+#重复抽样100次, 绘制均值分布图
+png(file = "gds4794-hist-sample100-mean.png")
+x<-replicate(100, mean(a[sample(a, 100)]))
+hist(x, freq = F, breaks = 100)
+dev.off()
+
+#对数转换（log）
+b<-log(a)
+x1<-min(b,na.rm=TRUE)
+x2<-max(b,na.rm=TRUE)
+#Frequency图
+hist(b, freq = F, breaks = 100)
+#概率密度分布图
+curve(dnorm(x,mean(b,na.rm=TRUE),sd(b,na.rm=TRUE)),xlim=c(x1,x2),col=
+"red",lwd=3, add=TRUE)
+
+sub.data <- as.numeric(unlist(data2[, sam.col.name]))
+a <-sub.data[sub.data<500]
+x1<-min(a,na.rm=TRUE) # 计算最小值
+x2<-max(a,na.rm=TRUE) # 计算最大值
+ave<-mean(a,na.rm=TRUE) # 计算均值
+med<-median(a,na.rm=TRUE) # 计算中位数
+# 连续分布的众数定义为其分布的密度函数峰值对应的取值
+ds=density(a,na.rm=TRUE)
+mode <- ds$x[which.max(ds$y)]
+quan<-quantile(a,na.rm=TRUE) # 计算四分位数 (0%,25%,50%,75%,100%)
+dnorm_png<-png("d1-means-medium-mode.png") # 定义图片文档
+hist(a, freq = F, breaks = 100) # 绘制频率分布直方图
+curve(dnorm(x,mean(a,na.rm=TRUE), sd(a,na.rm=TRUE)), xlim=c(x1,x2),
+col="blue", lwd=3, add=TRUE) # 绘制概率分布曲线
+abline(v=ave,lty=3,lwd=3,col="red") # 增加均值线
+abline(v=med,lty=3,lwd=3,col="purple") # 增加中位数线
+abline(v=mode,lty=3,lwd=3,col="green") # 增加众数线
+abline(v=quan,lty=3,lwd=3,col="blue") # 增加四分位数线
+dev.off() # 保存图片文档
+#箱型图
+png(file = "boxplot-all-log2.png")
+boxplot(log(data[,3:67]))
+dev.off()
+#条形图
+freq = matrix(rep(0,50),10,5) # 初始化频数矩阵
+for(i in 1:5){
+x <-table(as.numeric(cut(a[,i],10)))
+y <- as.data.frame(x)
+freq[,i] <- y[,2]
+}
+colnames(freq)<-colnames(a) # 列名
+#besides=T 时,单列数据中的每个值没有堆积起来,相邻排列,众坐标显
+示的每个数值。
+png(file = "barplot.png")
+barplot(t(freq),beside=T,col=rainbow(5))
+dev.off()
+# 堆积
+png(file = "barplot2.png")
+barplot(freq,col=rainbow(10))
+dev.off()
+#直方图
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+data<-Table(gds4794)
+data2 <- log(data[,3:67])
+x1<-min(data2,na.rm=TRUE)
+x2<-max(data2,na.rm=TRUE)
+y_max<-0.25
+dnorm_png<-png("all-hist.png")
+curve(dnorm(x,mean(data2[,1],na.rm=TRUE), sd(data2[,1],na.rm=TRUE)),
+xlim=c(x1,x2), ylim=c(0,y_max), col=1, lwd=3)
+for (i in 2:ncol(data2))
+{
+curve(dnorm(x,mean(data2[,i], na.rm=TRUE), sd(data2[,i], na.rm=TRUE)), add=TRUE
+, xlim=c(x1,x2), ylim=c(0,y_max), col=i, lwd=3)
+}
+dev.off()
+
+#Kappa一致性测量
+x<-cbind(c(12,17),c(2,129))
+library(vcd)0.4-0.75value p<0.05 如果Z值<1.96，则p>0.05，则k值大小没有意义
+Kappa(x)
+
+set.seed(1)#随机数种子发生器
+x<-seq(0,10,length.out=1000) #随机生产1000个0~10之间的数值
+y<-dchisq(x,1)#卡方分布模拟，自由度为1
+#绘制卡方分布去曲线2
+png(file = "chisq2.png")
+plot(x,y,col="red",xlim=c(0,10),ylim=c(0,0.5),type='l', lwd=3,
+xaxs="i", yaxs="i",ylab='density',xlab='',
+main="The Chisq Density Distribution")
+lines(x,dchisq(x,2),col="green", lwd=3) #卡方分布模拟曲线，自由度为2
+lines(x,dchisq(x,5),col="blue", lwd=3) #卡方分布模拟曲线，自由度为5
+lines(x,dchisq(x,10),col="orange", lwd=3) #卡方分布模拟曲线，自由度为10
+legend("topright",legend=paste("df=",c(1,2,5,10)), lwd=1, col=c("red",
+"green","blue","orange"))
+dev.off()
+
+卡方检验 p<0.05,拒绝原假设。
+卡方独立性检验的原假设就是这两个变量是彼此独立的，即不存在相关关系。
+卡方等比例检验原假设为某个变量在所有总体中的分布是一样的
+一个分类变量的总体分布服从某种特定的分布。
+# 把sub.data 从大到小分成 10 个区间进行频数统计
+freq = matrix(rep(0,20),10,2) # 初始化频数矩阵
+for(i in 1:2){
+x <-table(as.numeric(cut(sub.data[,i],10)))
+y <- as.data.frame(x)
+freq[,i] <- y[,2]
+}
+colnames(freq)<-colnames(sub.data) # 列名
+#卡方独立性检验/等比例检验：
+chisq.test(freq,correct=F)
+#卡方拟合优先度检验
+x<- freq[,1]
+p<-freq[,2]/sum(freq[,2])
+chisq.test(x, p = p, rescale.p = TRUE)
+
+单样本t检验：
+比比较较样样本本均均值值与与总总体体均均值值之之间间的的差差异异
+x<-c(159, 280, 101, 212, 224, 379, 179, 264, 222, 362, 168, 250, 149, 260, 485, 170)
+t.test(x, alternative = "greater", mu = 225)
+t.test(a,b,var.equal=TRUE) #等方差t检验
+t.test(a,b) #异方差t检验
+
+Pearson相关系数是用来衡量两个数据集合是否在一条线上面，它用来衡量定距变量间的线性关系
+#利用cor(x,y,method = c("pearson", "kendall",
+"spearman"))来计算
+#pearson相关系数用于连续数据
+#spearman相关系数用于分类数据
+#kendall秩相关系数
+setwd("D:/RFile/??????")
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+data<-Table(gds4794)
+rownames(data)<-data[,1]
+row.name = rownames(data)
+n = 1
+set.seed(1)
+sam.row.name = sample(row.name,n,replace=F)
+sam.row.name
+a <- unlist(data[sam.row.name,3:67])
+gene_name_a <- as.character(data[sam.row.name,2])
+gene_name_a
+
+p = NULL
+r = NULL
+for(i in 1:nrow(data)){
+  b <- unlist(data[i,3:67])
+  x <- cor.test(a,b, method="pearson")
+  p <- c(p,x$p.value)
+  r <- c(r,x$estimate)
+}
+names(p)<-data[,2]
+names(r)<-data[,2]
+
+p_value = 0.01
+r_cutoff = 0.6
+p2 <- p[p<p_value]
+r2 <- r[r>r_cutoff]
+length(p2)
+length(r2)
+
+genes <- intersect(names(p2),names(r2))
+genes[-match("ARHGAP26",genes)]
+length(genes)
+tail(genes)
+genes2 <-c(gene_name_a,genes[1:645])
+out = "pearson-related-genes.txt"
+write.table(genes2,out)
+
+正太分布检验shapiro.test()p>0.05,接受原假设,符合正态分布
+
+lm.sol <- lm(y~1+x)
+abline(lm.sol,col="red")
+summary(lm.sol)
+par(mfrow=c(2,2))
+plot(lm.sol)
+
+方差分析:
+wh.aov<-aov(weight~height,data=data2)
+summary(wh.aov)
+
+setwd("D:/RFile/")
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+
+data<-Table(gds4794)
+rownames(data)<-data[,1]
+row.name = rownames(data)
+
+n = 1
+set.seed(1)
+sam.row.name = sample(row.name,n,replace=F)
+sam.row.name
+a <- unlist(data[sam.row.name,3:67])
+gene_name_a <- as.character(data[sam.row.name,2])
+gene_name_a
+
+xb = NULL
+xk = NULL
+xr = NULL
+xp = NULL
+for(i in 1:nrow(data)){
+  if(data[i,1] != sam.row.name){
+    b <- unlist(data[i,3:67])
+    lm.sol <- lm(b~1+a)
+    suma <- summary(lm.sol)
+    xb <- c(xb,lm.sol$coefficients[1])
+    xk <- c(xk,lm.sol$coefficients[2])
+    xr <- c(xr,suma$r.squared)
+    pv <- 1-pf(suma$fstatistic[1],suma$fstatistic[2],suma$fstatistic[3])
+    xp <- c(xp,pv)
+  }
+}
+names(xb)<-data[-which(data$ID_REF==sam.row.name),1]
+names(xk)<-data[-which(data$ID_REF==sam.row.name),1]
+names(xr)<-data[-which(data$ID_REF==sam.row.name),1]
+names(xp)<-data[-which(data$ID_REF==sam.row.name),1]
+
+p_value = 0.01
+r_cutoff = 0.65
+xp2 <- xp[xp<p_value]
+xr2 <- xr[xr>r_cutoff]
+genes <- intersect(names(xp2),names(xr2))
+length(genes)
+
+maxgene = unlist(data[which(data$ID_REF=="1556761_at"),3:67])
+re_lm.sol = lm(maxgene~1+a)
+summary(re_lm.sol)
+
+png(file = "plot.png")
+par(mfrow=c(2,2))
+plot(re_lm.sol)
+dev.off()
+
+png(file = "plot2.png")
+plot(a,maxgene,lwd=2,main="plot2")
+y_mean=mean(maxgene)
+abline(h=y_mean,col="blue")
+x_mean=mean(a)
+abline(v=x_mean,col="purple")
+abline(re_lm.sol,col="red")
+dev.off()
+
+aov(a~maxgene)
+summary(aov(a~maxgene))
+
+方差齐次性:bartlett.test(x~A,data=ge)
+
+dir="D:/RFile/实验八"
+setwd(dir)
+library(GEOquery)
+gds6100 <- getGEO("GDS6100",destdir=dir)
+#查看数据类型
+mode(gds6100)
+#查看注释信息
+Meta(gds6100)
+#查看列注释信息=》用来确定哪些列是肿瘤，哪些列是正常对照
+Columns(gds6100)
+#提取数据
+data<-Table(gds6100)
+#查看数据表的列名
+colnames(data)
+#查看数据表行列数
+ncol(data)
+nrow(data)
+#前面两列是标题列，分别为探针id和基因名称
+#3：8列是 miRNA135b transfected，9：14列是 scambled transfected
+rownames(data)<-data[,1]
+#随机抽取至少1列数据
+n=1
+#按行随机抽样
+row.names<-rownames(data)
+sam.row.name <- sample(row.names,n,replace=F)
+sam.row.name
+
+ge<-data.frame(x<-t(data[sam.row.name,3:14]), A<-factor(substring(Columns(gds6100)$protocol,1,9)), B<-factor(substring(Columns(gds6100)$time,6)))
+ge
+
+#正态性检验
+shapiro.test(x)
+
+#方差齐性检验
+bartlett.test(x~A,data=ge)
+bartlett.test(x~B,data=ge)
+
+#绘图查看数据分布规律
+par(mfrow=c(2,2),las=2, cex.axis=1.2, cex.lab=1.2)
+plot(x~A+B,data=ge)
+interaction.plot(A,B,x,legend=F)
+interaction.plot(B,A,x,legend=F)
+
+#不考虑交互作用
+ge.aov<-aov(x~A+B,data=ge)
+summary(ge.aov)
+
+#考虑交互作用
+ge.aov2<-aov(x~A*B,data=ge)
+summary(ge.aov2)
+
+for(i in 1:48107){
+  ge<-data.frame(x<-t(data[i,3:14]), A<-factor(substring(Columns(gds6100)$protocol,1,9)), B<-factor(substring(Columns(gds6100)$time,6)))
+  #不考虑交互作用
+  ge.aov<-aov(x~A+B,data=ge)
+  ge.aov2<-aov(x~A*B,data=ge)
+  if(summary(ge.aov)[[1]]["Pr(>F)"][[1]][1]<0.1 && summary(ge.aov)[[1]]["Pr(>F)"][[1]][2]<0.1 && summary(ge.aov2)[[1]]["Pr(>F)"][[1]][1]>0.1 && summary(ge.aov2)[[1]]["Pr(>F)"][[1]][2]>0.1 && summary(ge.aov2)[[1]]["Pr(>F)"][[1]][3]>0.1){
+    break
+  }
+}
+
+n=1
+row.names<-rownames(data)
+sam.row.name <- sample(row.names,n,replace=F)
+sam.row.name
+ge<-data.frame(x<-t(data[sam.row.name,3:14]), A<-factor(substring(Columns(gds6100)$protocol,1,9)), B<-factor(substring(Columns(gds6100)$time,6)))
+#考虑交互作用
+ge.aov2<-aov(x~A*B,data=ge)
+summary(ge.aov2)
+
+
+多元线性回归:lm0<-lm(rating~.,data=data[,4:16])
+summary(lm0)
+lm.step<-step(lm0,direction="backward")
+par(mfrow=c(2,2)) # 同一个图形文件中绘制2*2=4 个图像
+plot(lm.step)
+# 多重共线性
+library(car)
+vif(lm.step)
+# 异常值检验
+library(car)
+outlierTest(lm.step)
+#car 包里的influencePlot() 函数能一次性同时检查离群点
+、高杠杆点、强影响点。
+library(car)
+png("lec10_Healthy_Breakfast_influencePlot.png")
+influencePlot(lm.step,id.method = "identity",
+main="Influence Plot", sub="Circle size is
+proportional to Cook's distance")
+dev.off()
+
+里：
+dir="D:/RFile/实验九"
+setwd(dir) # 设定工作目录
+file="Data_Healthy_Breakfast.txt"
+data<-read.table(file,head=TRUE,sep="\t")
+#查看数据信息
+head(data)
+ncol(data)
+nrow(data)
+
+png("lec10_Healthy_Breakfast_pairs.png")
+pairs(data[,4:16],panel=panel.smooth)
+dev.off()
+
+lm0<-lm(rating~.,data=data[,4:16])
+summary(lm0)
+
+lm.step<-step(lm0,direction="backward")
+summary(lm.step)
+
+png(file = "lec10_Healthy_Breakfast_lm_data.png")
+par(mfrow=c(2,2)) #同一个图形文件中绘制2*2=4个图像
+plot(lm.step)
+dev.off()
+
+library(car)
+vif(lm.step)
+
+#car包里influencePlot()函数能一次性同时检查离群点、高杠杆点、强影响点
+png("lec10_Healthy_Breakfast_influencePlot.png")
+influencePlot(lm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+
+
+
+table(data[,2]) #查看第2列数据种类
+table(data[,3]) #查看第3列数据种类
+data2<-data.frame(matrix(NA,77,20))
+for(i in 1:nrow(data))
+{
+  #第二列mfr分类
+  if(data[i,2]=="A"){data2[i,1:6]<-c(0,0,0,0,0,0)}
+  if(data[i,2]=="G"){data2[i,1:6]<-c(1,0,0,0,0,0)}
+  if(data[i,2]=="K"){data2[i,1:6]<-c(0,1,0,0,0,0)}
+  if(data[i,2]=="N"){data2[i,1:6]<-c(0,0,1,0,0,0)}
+  if(data[i,2]=="P"){data2[i,1:6]<-c(0,0,0,1,0,0)}
+  if(data[i,2]=="Q"){data2[i,1:6]<-c(0,0,0,0,1,0)}
+  if(data[i,2]=="R"){data2[i,1:6]<-c(0,0,0,0,0,1)}
+  #第三列type分类
+  if(data[i,3]=="C"){data2[i,7]<-0}
+  if(data[i,3]=="H"){data2[i,7]<-1}
+}
+data2[,8:20]<-data[,4:16]
+
+rownames(data2)<- data[,1]
+colnames(data2)<- c(paste("mfr_",c("G","K","N","P","Q","R"),sep=""),"type_CH",colnames(data)[4:16])
+head(data2)
+
+png("lec10_Healthy_Breakfast_pairs2.png")
+pairs(data2,panel=panel.smooth)
+dev.off()
+
+lm0<-lm(rating~.,data=data2)
+summary(lm0)
+
+lm.step<-step(lm0,direction="backward")
+summary(lm.step)
+
+png(file = "lec10_Healthy_Breakfast_lm_data2.png")
+par(mfrow=c(2,2)) #同一个图形文件中绘制2*2=4个图像
+plot(lm.step)
+dev.off()
+
+vif(lm.step)
+
+png("lec10_Healthy_Breakfast_influencePlot2.png")
+influencePlot(lm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+
+10.1
+dir="D:/RFile/??????"
+setwd(dir)
+file="US_Temperatures_Data.txt"
+data<-read.table(file,head=T,sep="\t")
+colnames(data)
+
+a<-max(data$JanTemp) - min(data$JanTemp) + 1
+png(file = "plot_y_x_t_scatter.png")
+cPal <- colorRampPalette(c('green','red'))
+Cols <- cPal(a)[as.numeric(cut(data$JanTemp,breaks = a))]
+plot(data$Long,data$Lat,pch = 20,col = Cols,cex=2)
+dev.off()
+
+model <- lm(JanTemp~Lat + Long + I(Long^2) + I(Long^3),data=data)
+summary(model)
+
+par(mfrow=c(2,2))
+plot(model)
+
+10.2
+dir="D:/RFile/实验十"
+setwd(dir)
+library(ggplot2)
+library(gridExtra) #针对ggplot2的多图排版
+#几次项？=》更改这个参数即可
+k=5
+#一共生成7组数据，每组100个数值
+group=7; n=100
+#自变量最大区间
+x_min=-3; x_max=3
+#系数区间
+b_min=-8; b_max=8
+#则因变量理论区间
+y_min=y_max=0
+for(j in 0:k){y_min = y_min + b_min*(x_max^j); y_max = y_max + b_max*(x_max^j)}
+#自变量波动区间
+c_min=-1;c_max=1
+#创建存储数据的data.frame，共3列，第一列group序号，第二列自变量x，第三列因变量y
+data<-data.frame(matrix(NA,group*n,3))
+colnames(data)<-c("group","x","y")
+#formula<-data.frame(matrix(NA,group,1)) #存放方程式
+#根据设定参数进行数据模拟
+for(i in 1:group)
+{
+  set.seed(i+runif(1,0,100))
+  x<-runif(n,min=x_min,max=x_max)
+  b<-round(runif(k+1,min=b_min,max=b_max))
+  c<-runif(n,min=c_min,max=c_max)
+  x<-x+c
+  y<-data.frame(matrix(0,n,1))
+  for(m in 0:k){ y <- y + b[m+1] *(x^m) }
+  from = (i-1)*n+1; to = n*i
+  data[from:to,1]=rep(i,n)
+  data[from:to,2]=x
+  data[from:to,3]=y
+}
+#绘制一元多次项模拟散点图+拟合曲线
+g1=ggplot(data, aes(x=x, y=y, colour=group)) + geom_point()#以颜色梯度区分
+data$group <- as.factor(data$group) #group列定义为因子
+g2=ggplot(data, aes(x=x, y=y, colour=group)) + geom_point() #以不同颜色区分
+g3= ggplot(data, aes(x=x, y=y, colour=group)) + geom_point() + stat_smooth(method='lm', formula=y~poly(x,k)) #增加拟合曲线
+g4= ggplot(data, aes(x=x, y=y, colour=group)) + geom_point() + stat_smooth(method='lm', formula=y~poly(x,k)) + theme(axis.title=element_text(face="bold",size=12), axis.text = element_text(face="bold",color="blue", size=10)) #增加图片修饰
+
+#注意4张图的区别，输出到一张图片上
+png(file = "plot_y_x-k_ggplot_5.png")
+grid.arrange(g1, g2, g3, g4, ncol=2)
+dev.off()
+
+dir="D:/RFile/实验十"
+setwd(dir)
+#加载GEOquery
+library(GEOquery)
+#加载本地的数据
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+#查看数据类型
+mode(gds4794)
+#查看注释信息
+Meta(gds4794)
+#查看列注释信息=》用来确定哪些列是肿瘤，哪些列是正常对照
+Columns(gds4794)
+#1：23是肺癌，24：65是正常组织
+data<-Table(gds4794)
+#查看数据表的列名
+colnames(data)
+#查看数据表行列数
+ncol(data)
+#[1] 67
+nrow(data)
+#[1] 54675
+#前面两列是标题列，分别为探针id和基因名称
+#3：25列是 lung cancer，26：67列是 normal
+#第一列探针IDs定义为data的行标题
+rownames(data)<-data[,1]
+
+#随机抽取至少10行数据
+n=10
+#使用以下代码进行循环测试：齐方差、F检验，p>0.1；齐方差、F检验，双因素p<0.1，无交互作用；齐方差、F检验，双因素p无要求，p<0.1
+#按行随机抽样【实验结果中需要记录】
+row.names<-rownames(data)
+sam.row.name <- sample(row.names,n,replace=F)
+sam.row.name #查看抽中的数据行探针id
+subdata<-data[sam.row.name,3:67] #提取抽样数据
+#加上样本病理类型数据共n+1列
+#初始化数据表
+data2<-data.frame(matrix(NA,65, n+1))
+#增加样本病理类型分类数据，肺癌=1，其他正常=0
+data2[,1]<-c(rep(1,23),rep(0,42))
+data2[,2:(n+1)]<-t(log(subdata)) #后面n列存放筛选出来的基因数据，注意矩阵行列转换
+colnames(data2)<-c("y",paste("x",1:n,sep="")) #设定列标题y,x1,x2,...,x10
+#以样本类型为因变量y，其他所有基因表达式水平为自变量x1,x2,...x10，进行总体回归分析
+glm0<-glm(y~.,family=binomial(link='logit'),data=data2)
+summary(glm0)
+#向后逐步回归法
+glm.step<-step(glm0,direction="backward")
+summary(glm.step)
+#绘制回归评估的4张图
+png(file = "glm4.png")
+par(mfrow=c(2,2))
+plot(glm.step)
+dev.off()
+#car包里的influencePlot()函数能一次性同时检查离群点、高杠杆点、强影响点
+library(car)
+png("influencePlot.png")
+influencePlot(glm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+#绘制subdata的热图
+colnames(subdata)<-Columns(gds4794)$disease.state
+png(file = "heatmap1.png")
+heatmap(as.matrix(log(subdata)), Rowv = NA, Colv = NA)
+dev.off()
+
+#变量初始化，用来存放计算结果中的p.value和fold change值
+p=NULL
+fold.change=NULL
+#R用Sys.time()可以查看当前系统时间
+#程序开始时记录：
+timestart<-Sys.time()
+#基因表达谱遍历
+for(i in 1:nrow(data))
+{
+  a <- unlist(data[i,3:25])
+  b <- unlist(data[i,26:67])
+  fold.change<-c(fold.change,mean(a,na.rm=TRUE)/mean(b,na.rm=TRUE))
+  x<-t.test(a,b)
+  p<-c(p,x$p.value)
+}
+#程序临结束时记录：
+timeend<-Sys.time()
+#程序运行时间：
+timeend-timestart
+#Time difference of 51.29762 secs
+#data第一列探针名IDs作为p和fold.change的名称
+names(p)<-data[,1]
+names(fold.change)<-data[,1]
+#设定阈值进行筛选
+p_value = 0.01
+up = 50 #lung cancer 上调2倍
+down = 0.02 #lung cancer 下调2倍
+#筛选
+p2 <- p[p<p_value] #p值筛选
+fc.up <- fold.change[fold.change>up] #上调基因
+fc.down <- fold.change[fold.change<down] #下调基因
+length(p2); length(fc.up); length(fc.down) #查看筛选结果
+#交集计算
+probes.up<-intersect(names(p2),names(fc.up)) #符合统计学显著性的上调基因
+length(probes.up)
+probes.down<-intersect(names(p2),names(fc.down)) #符合统计学显著性的下调基因
+length(probes.down)
+
+probes<-union(probes.up,probes.down) #合并合统计学显著性的上调和下调基因
+#上述过程合并进行
+#probes <- intersect(names(p2),union(names(fc.up),names(fc.down)))
+length(probes)
+subdata2<-data[probes,3:67] #从原始基因表达谱数据表中提取筛选出来的基因数据
+rownames(subdata2)<-probes #设定探针IDs为行标题
+nrow(subdata2)
+#如果筛选的基因数量过多，接下来则无法进行下去
+#加上样本病理类型数据共17列
+data3<-data.frame(matrix(NA,65, 17)) #初始化数据表
+data3[,1]<-c(rep(1,23),rep(0,42)) #增加样本病理类型分类数据，肺癌=1，其他正常=0
+data3[,2:17]<-t(log(subdata2)) #后面16列存放筛选出来的基因数据，注意矩阵行列转换
+colnames(data3)<-c("y",paste("x",1:16,sep="")) #设定列标题
+#以样本类型为因变量y，其他所有基因表达式水平为自变量x1,x2,...，进行总体回归分析
+glm0<-glm(y~.,family=binomial(link='logit'),data=data3)
+summary(glm0)
+glm.step<-step(glm0,direction="backward")
+summary(glm.step)
+png(file = "lec11_ICU_glm.png")
+par(mfrow=c(2,2))
+plot(glm.step)
+dev.off()
+#car包里的influencePlot()函数能一次性同时检查离群点、高杠杆点、强影响点。
+library(car)
+png("influencePlot.png")
+influencePlot(glm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+#绘制subdata2的热图
+colnames(subdata2)<-Columns(gds4794)$disease.state
+png(file = "heatmap.png")
+heatmap(as.matrix(log(subdata2)), Rowv = NA, Colv = NA)
+dev.off()
+
+10.3
+dir="D:/RFile/实验十"
+setwd(dir)
+file="US_Temperatures_Data.txt"
+data<-read.table(file,head=T,sep="\t")
+colnames(data)
+a<-max(data$JanTemp) - min(data$JanTemp) + 1 #设定颜色梯度区间
+png(file = "plot_y_x_t_scatter.png")
+cPal <- colorRampPalette(c('green','red'))
+Cols <- cPal(a)[as.numeric(cut(data$JanTemp,breaks = a))]
+plot(data$Long,data$Lat,pch = 20,col = Cols,cex=2)
+dev.off()
+
+model1=loess(JanTemp~Lat,data=data,span=0.4)
+summary(model1)
+png(file = "plot_T_Lat_loess.png")
+plot(data$JanTemp~data$Lat,pch = 20,col = Cols,cex=2)
+lines(data$Lat,model1$fit,col='red',lty=2,lwd=2)
+dev.off()
+
+#JanTemp~Long拟合
+model2=loess(JanTemp~Long,data=data,span=0.8)
+summary(model2)
+png(file = "plot_T_Long_loess.png")
+plot(data$JanTemp~data$Long,pch = 20,col = Cols,cex=2)
+lines(data$Long,model2$fit,col='red',lty=2,lwd=2)
+dev.off()
+
+#二元线性回归的探索
+lm.line<-lm(JanTemp~Lat+Long,data=data)
+summary(lm.line)
+png(file = "plot_y_x_t_lm.png")
+par(mfrow=c(2,2))
+plot(lm.line)
+dev.off()
+
+#Lat为线性，Long为三次项
+model <- lm(JanTemp ~ Lat + poly(Long,3),data=data)
+summary(model)
+#模型参数的置信区间
+confint(model, level=0.95)
+#拟合VS残差图,如果这是一个拟合效果比较不错的模型，应该看不到任何一种模型的特征
+png(file = "plot_T_Lat_Long_model_residuals.png")
+#par(mfrow=c(2,2))
+#plot(model)
+plot(fitted(model),residuals(model))
+dev.off()
+
+11.1
+dir="D:/RFile/实验十一"
+setwd(dir)
+file="15生信成绩.txt"
+scores<-read.table(file,head=T,sep="\t")
+colnames(scores)
+ncol(scores)
+#[1] 25 =》24门课程
+nrow(scores)
+#[1] 30
+#创建数据框
+data<-data.frame(scores[,2:25])
+colnames(data)<-paste("x",1:24, sep="")
+rownames(data)<-scores[,1]
+data #查看数据
+
+library(psych)
+corr.test(data)
+
+#原数据：
+png("boxplot1.png")
+boxplot(data,las=2)
+dev.off()
+#数据中心化，使其均值变为零【原点】
+data2<-scale(data, center=T,scale=F)
+data2
+png("boxplot2.png")
+boxplot(data2,las=2)
+dev.off()
+#数据围绕0附近波动，但是方差变异很大
+#数据标准化，除以方差
+data3<-scale(data, center=T, scale=T)
+data3
+png("boxplot3.png")
+boxplot(data3,las=2)
+dev.off()
+
+mc<-cov(data3)
+mc
+
+#cor：逻辑变量，若为cor=T表示用样本的相关矩阵R作主成分分析，cor=F, 表示用样本的协方差矩阵s作为主成分分析
+pca<-princomp(data,cor=T)
+pca2<-princomp(data2,cor=T)
+pca3<-princomp(data3,cor=T)
+#以上几个结果相同，princomp自动进行上述中心化和标准化处理
+pca
+
+summary(pca)
+pca[]#查看详细信息
+pca$sdev #Standard deviation
+pca$loadings #loading系数矩阵
+pca$center #每一门课程均值=》数据中心化
+pca$scale #每一门课程方差=》数据标准化
+pca$scores #每个样本每个组分的得分
+pca$loadings #查看loadins信息
+pca$loadings[] #查看loadings全部数值
+#计算得到各个样本主成分的数据=》等价于pca$scores
+pca_data <- predict(pca)
+
+#针对princomp()对象的plot方法#
+#该方法可以绘制展示每个主成分与其自身方差贡献度相关性的悬崖碎石图。
+png("lec12_bar-stone_plot1.png",width=600*3,height=3*300,res=72*3)
+par(mfrow=c(1,2),las=2)
+#条形图
+plot(pca)
+abline(h=1,type="2",col="red")
+#主成分的碎石图
+screeplot(pca, type="lines")
+abline(h=1,type="2",col="red")
+dev.off()
+
+#=》主成分分布更为离散=》把30个样本区分的更好
+#得分图（Score plot）
+png("lec12_15scores_scores_plot6.png",width=600*3,height=3*400,res=72*3)
+par(mfrow=c(2,3))
+#主成分分析之后的前两个主成分得分绘图
+plot(pca$scores[,1], pca$scores[,2],type="n")
+text(pca$scores[,1],pca$scores[,2],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,1], pca$scores[,3],type="n")
+text(pca$scores[,1],pca$scores[,3],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,1], pca$scores[,4],type="n")
+text(pca$scores[,1],pca$scores[,4],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,2], pca$scores[,3],type="n")
+text(pca$scores[,2],pca$scores[,3],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,2], pca$scores[,4],type="n")
+text(pca$scores[,2],pca$scores[,4],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,3], pca$scores[,4],type="n")
+text(pca$scores[,3],pca$scores[,4],labels=rownames(pca$scores),cex=0.8)
+dev.off()
+
+png("lec12_15scores_loadings_plot6.png",width=600*3,height=3*400,res=72*3)
+par(mfrow=c(2,3))
+#主成分分析之后的前两个主成分得分绘图
+plot(pca$loadings[,1], pca$loadings[,2],type="n")
+text(pca$loadings[,1],pca$loadings[,2],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,1], pca$loadings[,3],type="n")
+text(pca$loadings[,1],pca$loadings[,3],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,1], pca$loadings[,4],type="n")
+text(pca$loadings[,1],pca$loadings[,4],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,2], pca$loadings[,3],type="n")
+text(pca$loadings[,2],pca$loadings[,3],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,2], pca$loadings[,4],type="n")
+text(pca$loadings[,2],pca$loadings[,4],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,3], pca$loadings[,4],type="n")
+text(pca$loadings[,3],pca$loadings[,4],labels=rownames(pca$loadings),cex=0.8)
+dev.off()
+
+11.2
+#设定工作目录
+dir="D:/RFile/实验十一"
+setwd(dir)
+#加载GEOquery
+library(GEOquery)
+#加载本地的数据
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+#查看数据类型
+mode(gds4794)
+#查看注释信息
+Meta(gds4794)
+#查看列注释信息=》用来确定哪些列是肿瘤，哪些列是正常对照
+Columns(gds4794)
+#1：23是肺癌，24：65是正常组织
+data<-Table(gds4794)
+colnames(data)
+#查看数据表行列数
+ncol(data)
+#[1] 67
+nrow(data)
+#[1] 54675
+#前面两列是标题列，分别为探针id和基因名称
+#3：25列是 lung cancer，26：67列是 normal
+#第一列探针IDs定义为data的行标题
+rownames(data)<-data[,1]
+
+#变量初始化，用来存放计算结果中的p.value和fold change值
+p=NULL
+fold.change=NULL
+#R用Sys.time()可以查看当前系统时间
+#程序开始时记录：
+timestart<-Sys.time()
+#基因表达谱遍历
+for(i in 1:nrow(data))
+{
+  a <- unlist(data[i,3:25])
+  b <- unlist(data[i,26:67])
+  fold.change<-c(fold.change,mean(a,na.rm=TRUE)/mean(b,na.rm=TRUE))
+  x<-t.test(a,b)
+  p<-c(p,x$p.value)
+}
+#程序临结束时记录：
+timeend<-Sys.time()
+#程序运行时间：
+timeend-timestart
+#Time difference of 51.29762 secs
+#data第一列探针名IDs作为p和fold.change的名称
+names(p)<-data[,1]
+names(fold.change)<-data[,1]
+#设定阈值进行筛选
+p_value = 0.05
+up = 40 #lung cancer 上调40倍
+down = 1/40 #lung cancer 下调1/40倍
+#筛选
+p2 <- p[p<p_value] #p值筛选
+fc.up <- fold.change[fold.change>up] #上调基因
+fc.down <- fold.change[fold.change<down] #下调基因
+length(p2); length(fc.up); length(fc.down) #查看筛选结果
+#交集计算
+probes.up<-intersect(names(p2),names(fc.up)) #符合统计学显著性的上调基因
+length(probes.up)
+probes.down<-intersect(names(p2),names(fc.down)) #符合统计学显著性的下调基因
+length(probes.down)
+probes<-union(probes.up,probes.down) #合并合统计学显著性的上调和下调基因
+#上述过程合并进行
+#probes <- intersect(names(p2),union(names(fc.up),names(fc.down)))
+length(probes)
+subdata<-log(data[probes,3:67]) #从原始基因表达谱数据表中提取筛选出来的基因数据
+rownames(subdata)<-probes #设定探针IDs为行标题
+nrow(subdata)
+
+#数据标准化，除以方差
+subdata2<-scale(t(subdata), center=T, scale=T)
+rownames(subdata2)<-rep(1:65) #使用数据编号代替样本名称
+#subdata2
+png("lec12_gds4794_clustering_boxplot1.png",width=600*3,height=300*3,res=72*3)
+par(mfrow=c(1,2),las=2)
+boxplot(t(subdata))
+boxplot(subdata2)
+dev.off()
+
+d<-dist(subdata2, method = "euclidean")
+#r语言中使用hclust(d, method = "complete", members=NULL) 来进行层次聚类。
+hc<-hclust(d,"single")
+png("lec12_gds4794_clustering_tree_plot.png",width=600,height=300)
+plot(hc)
+dev.off()
+
+#使用rect.hclust(tree, k = NULL, which = NULL, x = NULL, h = NULL,border =2, cluster = NULL)来确定类的个数。 tree就是求出来的对象。k为分类的个数，h为类间距离的阈值。border是画出来的颜色，用来分类的
+png("lec12_gds4794_clustering_tree_plot2.png", width=600,height=300)
+plot(hc)
+rect.hclust(hc,k=4)
+dev.off()
+result=cutree(hc,k=4) #该函数可以用来提取每个样本的所属类别
+result
+
+12.1
+dir="D:/RFile/实验十二"
+setwd(dir)
+file="e12-data-1-1.txt"
+data<-read.table(file,head=T,sep="\t")
+data
+x<-data[,2];y<-data[,3]
+
+png("e12_data-1-1_boxplot.png")
+boxplot(data[,2:3])
+dev.off()
+
+shapiro.test(x)
+shapiro.test(y)
+
+data2<-data.frame(X<-c(data[,2],data[,3]),A<-factor(rep(1:2,c(21,21))))
+#Bartlett检验 - 如果我们的数据服从正态分布，那么这种方法将是最为适用的。对于正态分布的数据，这种检验极为灵敏；而当数据为非正态分布时，使用该方法则很容易导致假阳性误判。
+bartlett.test(data[,2:3])
+#或bartlett.test(X~A,data=data2)
+#Levene检验 – 相较于Bartlett检验，这一方法更为稳健，这一方法被封装于car程序包中。
+library(car)
+leveneTest(X~A,data=data2)
+#Fligner-Killeen检验 – 这是一个非参数的检验方法，完全不依赖于对分布的假设
+fligner.test(X~A,data=data2)
+
+#H0:Md=0，H1:Md≠0
+wilcox.test(x, y, paired = TRUE, alternative = "two.sided")
+
+#H0:μ1=μ2, H1: μ1≠μ2
+t.test(x,y, paired = TRUE, var.equal=TRUE, alternative = "two.sided")
+
+#H0:μ1=μ2, H1: μ1≠μ2
+t.test(x,y, paired = TRUE, alternative = "two.sided")
+
+12.2
+dir="D:/RFile/实验十二"
+setwd(dir)
+file="e12-data-2-1-win.txt"
+data<-read.table(file,head=T,sep="\t")
+data
+
+png("e12_data-2-1_boxplot.png")
+boxplot(data)
+dev.off()
+
+shapiro.test(data[,1])
+shapiro.test(data[,2])
+shapiro.test(data[,3])
+
+data2<-data.frame(X<-c(data[,1],data[,2],data[,3]),A<-factor(rep(1:3,c(24,24,24))))
+bartlett.test(data)
+library(car)
+leveneTest(X~A,data=data2)
+fligner.test(X~A,data=data2)
+
+library( agricolae)
+#H0:M1=M2=M3, H1:三者不等
+kruskal.test(X~A,data=data2)
+
+m<-aov(X~A,data=data2)
+summary(m)
+
+mm<-TukeyHSD(m)
+mm
+png("e12_data-2-1_TurkeyHSD_plot.png")
+plot(mm)
+dev.off()
+
+12.3
+dir="D:/RFile/实验十二"
+setwd(dir)
+file="e12-data-3-1-win.txt"
+data<-read.table(file,head=T,sep="\t")
+data
+
+png("e12_data-3-1_boxplot.png")
+boxplot(data[,2:5])
+dev.off()
+
+apply(data[,2:5],2,shapiro.test)
+
+data2<-data.frame(X<-c(data[,2],data[,3],data[,4],data[,5]), A<-factor(rep(1:4,rep(9,4))))
+bartlett.test(data[,2:5])
+library(car)
+leveneTest(X~A,data=data2)
+fligner.test(X~A,data=data2)
+
+dm<-as.matrix(data[,2:5])
+dimnames(dm) <- list(1:9, c("A", "B", "C", "D"))
+friedman.test(dm)
+
+m<-aov(X~A,data=data2)
+summary(m)
+
+mm<-TukeyHSD(m)
+mm
+png("e12_data-3-1_TurkeyHSD_plot.png")
+plot(mm)
+dev.off()
+
+13.
+setwd("D:/RFile/实验十三")
+data1 <- read.csv("1.csv",header = FALSE)
+barplot(data[5:35,2],names.arg = data[5:35,1],cex.names = 0.6,main = "2013年中国各地医院数量统计图")
+
+data2 <- read.csv("2.csv",header = TRUE)
+plot(x=data2[,1],y=data2[,2],type = "o",col = "red",ylim=c(-10,40))
+lines(x=data2[,1],y=data2[,3],type = "o", col = "blue")
+lines(x=data2[,1],y=data2[,4],type = "o", col = "green")
+legend("topright",legend=c("出生率","死亡率","自然增长率"),col=c("red","blue","green"),lwd=3,lty=c(1,1,1))
+
+data3 <- read.csv("3.csv",header = FALSE)
+barplot(data3[,2],names.arg = data3[,1],cex.names = 0.6,main = "2008年中国患病率统计图")
+
+data4 <- read.csv("4.csv",header = TRUE)
+plot(x=data4[,1],y=data4[,2],type = "o",col = "red",ylim=c(0,100),main="城市农村高血压患病情况")
+lines(x=data4[,1],y=data4[,3],type = "o", col = "blue")
+legend("topleft",legend=c("城市","农村"),col=c("red","blue"),lwd=3,lty=c(1,1))
+
+x<-cbind(c(212,208),c(223,149))
+chisq.test(x,correct=F)
+
+x<-cbind(c(54,104,52),c(69,85,32))
+chisq.test(x,correct=F)
+
+实验1、统计基础练习1..................................................................................................................................1
+实验2、统计基础练习2..................................................................................................................................9
+实验3、统计绘图...........................................................................................................................................14
+实验4、分类数据分析...................................................................................................................................18
+实验5、t检验.................................................................................................................................................21
+实验6、Pearson相关分析.............................................................................................................................27
+实验7、R语言中线性回归分析和方差分析...............................................................................................32
+实验8、多因素方差分析和协方差分析......................................................................................................34
+实验9、多元线性回归分析...........................................................................................................................37
+实验10、Logistic回归和多项式回归分析...................................................................................................44
+实验11、聚类分析.........................................................................................................................................55
+实验12、非参数统计分析.............................................................................................................................62
+实验13、医学和流行病学统计
