@@ -1,0 +1,980 @@
+10.Logit 多项式 回归
+1、多次项曲线的模拟：
+1.1、一元多次项模拟：
+至少模拟2~5次项曲线，看看有没有什么规律？
+dir="D:/RFile/实验十"
+setwd(dir)
+library(ggplot2)
+library(gridExtra) #针对ggplot2的多图排版
+#几次项？=》更改这个参数即可
+k=2
+#一共生成7组数据，每组100个数值
+group=7; n=100
+#自变量最大区间
+x_min=-3; x_max=3
+#系数区间
+b_min=-8; b_max=8
+#则因变量理论区间
+y_min=y_max=0
+for(j in 0:k){y_min = y_min + b_min*(x_max^j); y_max = y_max + b_max*(x_max^j)}
+#自变量波动区间
+c_min=-1;c_max=1
+#创建存储数据的data.frame，共3列，第一列group序号，第二列自变量x，第三列因变量y
+data<-data.frame(matrix(NA,group*n,3))
+colnames(data)<-c("group","x","y")
+#formula<-data.frame(matrix(NA,group,1)) #存放方程式
+#根据设定参数进行数据模拟
+for(i in 1:group)
+{
+set.seed(i+runif(1,0,100))
+x<-runif(n,min=x_min,max=x_max)
+b<-round(runif(k+1,min=b_min,max=b_max))
+c<-runif(n,min=c_min,max=c_max)
+x<-x+c
+y<-data.frame(matrix(0,n,1))
+for(m in 0:k){ y <- y + b[m+1] *(x^m) }
+from = (i-1)*n+1; to = n*i
+data[from:to,1]=rep(i,n)
+data[from:to,2]=x
+data[from:to,3]=y
+}
+#绘制一元多次项模拟散点图+拟合曲线
+g1=ggplot(data, aes(x=x, y=y, colour=group)) + geom_point()#以颜色梯度区分
+data$group <- as.factor(data$group) #group列定义为因子
+g2=ggplot(data, aes(x=x, y=y, colour=group)) + geom_point() #以不同颜色区分
+g3= ggplot(data, aes(x=x, y=y, colour=group)) + geom_point() + stat_smooth(method='lm', formula=y~poly(x,k)) #增加拟合曲线
+g4= ggplot(data, aes(x=x, y=y, colour=group)) + geom_point() + stat_smooth(method='lm', formula=y~poly(x,k)) + theme(axis.title=element_text(face="bold",size=12), axis.text = element_text(face="bold",color="blue", size=10)) #增加图片修饰
+#注意4张图的区别，输出到一张图片上
+png(file = "plot_y_x-k_ggplot_2.png")
+grid.arrange(g1, g2, g3, g4, ncol=2)
+dev.off()
+2、基于基因表达水平（自变量xi）的样本类型的Logistic回归分析：
+该环节需要大家提前准备好一个基因表达谱数据，如果没有，则有授课教师提供（gds4794）。尝试把不同样本作为因变量（y），几万个基因表达水平作为自变量（x1，2，...），进行探讨。
+2.1、数据读取：
+#加载本地的数据
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+#查看数据类型
+mode(gds4794)
+#查看注释信息
+Meta(gds4794)
+#查看列注释信息=》用来确定哪些列是肿瘤，哪些列是正常对照
+Columns(gds4794)
+#1：23是肺癌，24：65是正常组织
+data<-Table(gds4794)
+#查看数据表的列名
+colnames(data)
+#查看数据表行列数
+ncol(data)
+#[1] 67
+nrow(data)
+#[1] 54675
+#前面两列是标题列，分别为探针id和基因名称
+#3：25列是 lung cancer，26：67列是 normal
+#第一列探针IDs定义为data的行标题
+rownames(data)<-data[,1]
+2.2、随机取样分析：
+至少有3个基因的表达水平回归分析结果达到0.05的显著水平。
+#随机抽取至少10行数据
+n=10
+#使用以下代码进行循环测试：齐方差、F检验，p>0.1；齐方差、F检验，双因素p<0.1，无交互作用；齐方差、F检验，双因素p无要求，p<0.1
+#按行随机抽样【实验结果中需要记录】
+row.names<-rownames(data)
+sam.row.name <- sample(row.names,n,replace=F)
+sam.row.name #查看抽中的数据行探针id
+subdata<-data[sam.row.name,3:67] #提取抽样数据
+#加上样本病理类型数据共n+1列
+#初始化数据表
+data2<-data.frame(matrix(NA,65, n+1))
+#增加样本病理类型分类数据，肺癌=1，其他正常=0
+data2[,1]<-c(rep(1,23),rep(0,42))
+data2[,2:(n+1)]<-t(log(subdata)) #后面n列存放筛选出来的基因数据，注意矩阵行列转换
+colnames(data2)<-c("y",paste("x",1:n,sep="")) #设定列标题y,x1,x2,...,x10
+#以样本类型为因变量y，其他所有基因表达式水平为自变量x1,x2,...x10，进行总体回归分析
+glm0<-glm(y~.,family=binomial(link='logit'),data=data2)
+summary(glm0)
+#向后逐步回归法
+glm.step<-step(glm0,direction="backward")
+summary(glm.step)
+#绘制回归评估的4张图
+png(file = "glm4.png")
+par(mfrow=c(2,2))
+plot(glm.step)
+dev.off()
+#car包里的influencePlot()函数能一次性同时检查离群点、高杠杆点、强影响点
+library(car)
+png("influencePlot.png")
+influencePlot(glm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+#绘制subdata的热图
+colnames(subdata)<-Columns(gds4794)$disease.state
+png(file = "heatmap1.png")
+heatmap(as.matrix(log(subdata)), Rowv = NA, Colv = NA)
+dev.off()
+2.3、差异表达基因分析：
+#变量初始化，用来存放计算结果中的p.value和fold change值
+p=NULL
+fold.change=NULL
+#R用Sys.time()可以查看当前系统时间
+#程序开始时记录：
+timestart<-Sys.time()
+#基因表达谱遍历
+for(i in 1:nrow(data))
+{
+a <- unlist(data[i,3:25])
+b <- unlist(data[i,26:67])
+fold.change<-c(fold.change,mean(a,na.rm=TRUE)/mean(b,na.rm=TRUE))
+x<-t.test(a,b)
+p<-c(p,x$p.value)
+}
+#程序临结束时记录：
+timeend<-Sys.time()
+#程序运行时间：
+timeend-timestart
+#Time difference of 51.29762 secs
+#data第一列探针名IDs作为p和fold.change的名称
+names(p)<-data[,1]
+names(fold.change)<-data[,1]
+#设定阈值进行筛选
+p_value = 0.01
+up = 50 #lung cancer 上调2倍
+down = 0.02 #lung cancer 下调2倍
+#筛选
+p2 <- p[p<p_value] #p值筛选
+fc.up <- fold.change[fold.change>up] #上调基因
+fc.down <- fold.change[fold.change<down] #下调基因
+length(p2); length(fc.up); length(fc.down) #查看筛选结果
+#交集计算
+probes.up<-intersect(names(p2),names(fc.up)) #符合统计学显著性的上调基因
+length(probes.up)
+probes.down<-intersect(names(p2),names(fc.down)) #符合统计学显著性的下调基因
+length(probes.down)
+2.5、混合上调和下调基因进行Logistic回归分析：
+probes<-union(probes.up,probes.down) #合并合统计学显著性的上调和下调基因
+#上述过程合并进行
+#probes <- intersect(names(p2),union(names(fc.up),names(fc.down)))
+length(probes)
+subdata2<-data[probes,3:67] #从原始基因表达谱数据表中提取筛选出来的基因数据
+rownames(subdata2)<-probes #设定探针IDs为行标题
+nrow(subdata2)
+#如果筛选的基因数量过多，接下来则无法进行下去
+#加上样本病理类型数据共17列
+data3<-data.frame(matrix(NA,65, 17)) #初始化数据表
+data3[,1]<-c(rep(1,23),rep(0,42)) #增加样本病理类型分类数据，肺癌=1，其他正常=0
+data3[,2:17]<-t(log(subdata2)) #后面16列存放筛选出来的基因数据，注意矩阵行列转换
+colnames(data3)<-c("y",paste("x",1:16,sep="")) #设定列标题
+#以样本类型为因变量y，其他所有基因表达式水平为自变量x1,x2,...，进行总体回归分析
+glm0<-glm(y~.,family=binomial(link='logit'),data=data3)
+summary(glm0)
+glm.step<-step(glm0,direction="backward")
+summary(glm.step)
+png(file = "lec11_ICU_glm.png")
+par(mfrow=c(2,2))
+plot(glm.step)
+dev.off()
+#car包里的influencePlot()函数能一次性同时检查离群点、高杠杆点、强影响点。
+library(car)
+png("influencePlot.png")
+influencePlot(glm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+#绘制subdata2的热图
+colnames(subdata2)<-Columns(gds4794)$disease.state
+png(file = "heatmap.png")
+heatmap(as.matrix(log(subdata2)), Rowv = NA, Colv = NA)
+dev.off()
+3、多项式回归分析：
+探索经纬度与温度变化的关系。
+3.1、数据读取与可视化：
+file="US_Temperatures_Data"
+data<-read.table(file,head=T,sep="\t")
+colnames(data)
+a<-max(data$JanTemp) - min(data$JanTemp) + 1 #设定颜色梯度区间
+png(file = "plot_y_x_t_scatter.png")
+cPal <- colorRampPalette(c('green','red'))
+Cols <- cPal(a)[as.numeric(cut(data$JanTemp,breaks = a))]
+plot(data$Long,data$Lat,pch = 20,col = Cols,cex=2)
+dev.off()
+3.2、局部多项式回归拟合探索：
+在R语言中进行局部多项式回归拟合是利用loess函数
+LOESS的优势是并不需要确定具体的函数形式，而是让数据自己来说话，其缺点在于需要大量的数据和运算能力。LOESS作为一种平滑技术，其目的是为了探寻响应变量和预测变量之间的关系，所以LOESS更被看作一种数据探索法，而不是作为最终的结论。
+用loess来建立模型时重要的两个参数是span和degree，span表示数据子集的获取范围，取值越大则数据子集越多，曲线越为平滑。degree表示局部回归中的阶数，1表示线性回归，2表示二次回归（默认），也可以取0，此时曲线退化为简单移动平均线。这里我们设span取0.4和0.8，从下图可见取值0.8的蓝色线条较为平滑。
+（1） JanTemp~Lat拟合
+model1=loess(JanTemp~Lat,data=data,span=0.4)
+summary(model1)
+png(file = "plot_T_Lat_loess.png")
+plot(data$JanTemp~data$Lat,pch = 20,col = Cols,cex=2)
+lines(data$Lat,model1$fit,col='red',lty=2,lwd=2)
+dev.off()
+（2） JanTemp~Long拟合
+#JanTemp~Long拟合
+model2=loess(JanTemp~Long,data=data,span=0.8)
+summary(model2)
+png(file = "plot_T_Long_loess.png")
+plot(data$JanTemp~data$Long,pch = 20,col = Cols,cex=2)
+lines(data$Long,model2$fit,col='red',lty=2,lwd=2)
+dev.off()
+3.3、二元线性回归分析：
+#二元线性回归的探索
+lm.line<-lm(JanTemp~Lat+Long,data=data)
+summary(lm.line)
+png(file = "plot_y_x_t_lm.png")
+par(mfrow=c(2,2))
+plot(lm.line)
+dev.off()
+3.4、多项式回归分析：
+#Lat为线性，Long为三次项
+model <- lm(JanTemp ~ Lat + poly(Long,3),data=data)
+summary(model)
+#模型参数的置信区间
+confint(model, level=0.95)
+#拟合VS残差图,如果这是一个拟合效果比较不错的模型，应该看不到任何一种模型的特征
+png(file = "plot_T_Lat_Long_model_residuals.png")
+par(mfrow=c(2,2))
+plot(model)
+plot(fitted(model),residuals(model))
+dev.off()
+
+11.聚类分析
+1、学生成绩的主成分分析：
+利用教师提供的学生多门课程成绩表，开展主成分分析实践，看看能够有效地提取反应不同课程成绩分布特征信息的主成分，以及这些主成分能够有效地区分不同学生的学习成绩特点。
+1.1、读取学生成绩数据：
+dir="D:/RFile/实验十一"
+setwd(dir)
+file="15生信成绩.txt"
+scores<-read.table(file,head=T,sep="\t")
+colnames(scores)
+ncol(scores)
+#[1] 25 =》24门课程
+nrow(scores)
+#[1] 30
+#创建数据框
+data<-data.frame(scores[,2:25])
+colnames(data)<-paste("x",1:24, sep="")
+rownames(data)<-scores[,1]
+data #查看数据
+1.2、分析各门课程成绩之间的相关性：
+library(psych)
+corr.test(data)
+1.4、数据的标准化处理前后的对比：
+#原数据：
+png("boxplot1.png")
+boxplot(data,las=2)
+dev.off()
+#数据中心化，使其均值变为零【原点】
+data2<-scale(data, center=T,scale=F)
+data2
+png("lboxplot2.png")
+boxplot(data2,las=2)
+dev.off()
+#数据围绕0附近波动，但是方差变异很大
+#数据标准化，除以方差
+data3<-scale(data, center=T, scale=T)
+data3
+png("boxplot3.png")
+boxplot(data3,las=2)
+dev.off()
+1.6、标准化数据协方差矩阵的计算：
+mc<-cov(data3)
+mc
+1.7、主成分分析（PCA）：
+#cor：逻辑变量，若为cor=T表示用样本的相关矩阵R作主成分分析，cor=F, 表示用样本
+的协方差矩阵s作为主成分分析
+pca<-princomp(data,cor=T)
+pca2<-princomp(data2,cor=T)
+pca3<-princomp(data3,cor=T)
+#以上几个结果相同，princomp自动进行上述中心化和标准化处理
+Pca
+1.8、观察主成分分析的摘要信息：
+summary(pca)
+pca[]#查看详细信息
+pca$sdev #Standard deviation
+pca$loadings #loading系数矩阵
+pca$center #每一门课程均值=》数据中心化
+pca$scale #每一门课程方差=》数据标准化
+pca$scores #每个样本每个组分的得分
+pca$loadings #查看loadins信息
+pca$loadings[] #查看loadings全部数值
+#计算得到各个样本主成分的数据=》等价于pca$scores
+pca_data <- predict(pca)
+1.9、绘图查看主成分的变异贡献度：
+#针对princomp()对象的plot方法#
+#该方法可以绘制展示每个主成分与其自身方差贡献度相关性的悬崖碎石图。
+png("lec12_bar-stone_plot1.png",width=600*3,height=3*300,res=72*3)
+par(mfrow=c(1,2),las=2)
+#条形图
+plot(pca)
+abline(h=1,type="2",col="red")
+#主成分的碎石图
+screeplot(pca, type="lines")
+abline(h=1,type="2",col="red")
+dev.off()
+1.10、绘制得分（scores）图：
+#=》主成分分布更为离散=》把30个样本区分的更好
+#得分图（Score plot）
+png("lec12_15scores_scores_plot6.png",width=600*3,height=3*400,res=72*3)
+par(mfrow=c(2,3))
+#主成分分析之后的前两个主成分得分绘图
+plot(pca$scores[,1], pca$scores[,2],type="n")
+text(pca$scores[,1],pca$scores[,2],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,1], pca$scores[,3],type="n")
+text(pca$scores[,1],pca$scores[,3],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,1], pca$scores[,4],type="n")
+text(pca$scores[,1],pca$scores[,4],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,2], pca$scores[,3],type="n")
+text(pca$scores[,2],pca$scores[,3],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,2], pca$scores[,4],type="n")
+text(pca$scores[,2],pca$scores[,4],labels=rownames(pca$scores),cex=0.8)
+plot(pca$scores[,3], pca$scores[,4],type="n")
+text(pca$scores[,3],pca$scores[,4],labels=rownames(pca$scores),cex=0.8)
+dev.off()
+1.11、绘制载荷（loadings）图：
+png("lec12_15scores_loadings_plot6.png",width=600*3,height=3*400,res=72*3)
+par(mfrow=c(2,3))
+#主成分分析之后的前两个主成分得分绘图
+plot(pca$loadings[,1], pca$loadings[,2],type="n")
+text(pca$loadings[,1],pca$loadings[,2],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,1], pca$loadings[,3],type="n")
+text(pca$loadings[,1],pca$loadings[,3],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,1], pca$loadings[,4],type="n")
+text(pca$loadings[,1],pca$loadings[,4],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,2], pca$loadings[,3],type="n")
+text(pca$loadings[,2],pca$loadings[,3],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,2], pca$loadings[,4],type="n")
+text(pca$loadings[,2],pca$loadings[,4],labels=rownames(pca$loadings),cex=0.8)
+plot(pca$loadings[,3], pca$loadings[,4],type="n")
+text(pca$loadings[,3],pca$loadings[,4],labels=rownames(pca$loadings),cex=0.8)
+dev.off()
+2、基于肿瘤组和对照组基因表达谱的聚类分析：
+该环节需要大家提前准备好一个基因表达谱数据，如果没有，则有授课教师提供（gds4794）。
+2.1、读取数据：
+在R语言环境中，加载GEOquery包，读取 gds4794数据集；其中包含了肺癌和正常对照样本两种病理类型数据；
+2.2、差异表达基因筛选：
+按照基因（探针）表达水平采用t检验进行统计分析，计算差异显著性p值，以及差异表达倍数（肺癌/正常）；
+设定好筛选的p值和上、下调倍数【注意：每个同学按照学号顺序，上调倍数从起始11倍开始设定，下调倍数是该数值的倒数】；
+按照设定阈值，筛选出区别这两组样本的主要基因（探针）；
+提取这些差异表达基因的表达水平数据。
+#变量初始化，用来存放计算结果中的p.value和fold change值
+p=NULL
+fold.change=NULL
+#R用Sys.time()可以查看当前系统时间
+#程序开始时记录：
+timestart<-Sys.time()
+#基因表达谱遍历
+for(i in 1:nrow(data))
+{
+a <- unlist(data[i,3:25])
+b <- unlist(data[i,26:67])
+fold.change<-c(fold.change,mean(a,na.rm=TRUE)/mean(b,na.rm=TRUE))
+x<-t.test(a,b)
+p<-c(p,x$p.value)
+}
+#程序临结束时记录：
+timeend<-Sys.time()
+#程序运行时间：
+timeend-timestart
+#Time difference of 51.29762 secs
+#data第一列探针名IDs作为p和fold.change的名称
+names(p)<-data[,1]
+names(fold.change)<-data[,1]
+#设定阈值进行筛选
+p_value = 0.05
+up = 10 #lung cancer 上调2倍
+down = 0.1 #lung cancer 下调2倍
+#筛选
+p2 <- p[p<p_value] #p值筛选
+fc.up <- fold.change[fold.change>up] #上调基因
+fc.down <- fold.change[fold.change<down] #下调基因
+length(p2); length(fc.up); length(fc.down) #查看筛选结果
+#交集计算
+probes.up<-intersect(names(p2),names(fc.up)) #符合统计学显著性的上调基因
+length(probes.up)
+probes.down<-intersect(names(p2),names(fc.down)) #符合统计学显著性的下调基因
+length(probes.down)
+probes<-union(probes.up,probes.down) #合并合统计学显著性的上调和下调基因
+#上述过程合并进行
+#probes <- intersect(names(p2),union(names(fc.up),names(fc.down)))
+length(probes)
+subdata<-log(data[probes,3:67]) #从原始基因表达谱数据表中提取筛选出来的基因数据
+rownames(subdata)<-probes #设定探针IDs为行标题
+nrow(subdata)
+2.3、数据标准化前后的对比：
+注意表达水平数据矩阵的行列转换，原数据矩阵列为样本，行为基因（探针），后续分析需要进行行列转置。
+#数据标准化，除以方差
+subdata2<-scale(t(subdata), center=T, scale=T)
+rownames(subdata2)<-rep(1:65) #使用数据编号代替样本名称
+#subdata2
+png("lec12_gds4794_clustering_boxplot1.png",width=600*3,height=300*3,res=72*3)
+par(mfrow=c(1,2),las=2)
+boxplot(t(subdata))
+boxplot(subdata2)
+dev.off()
+2.4、层次聚类
+根据标准化的基因表达水平计算不同样本之间的距离，然后按照“最短距离”策略急性层次聚类分析。
+d<-dist(subdata2, method = "euclidean")
+#r语言中使用hclust(d, method = "complete", members=NULL) 来进行层次聚类。
+hc<-hclust(d,"single")
+png("lec12_gds4794_clustering_tree_plot.png",width=600,height=300)
+plot(hc)
+dev.off()
+2.5、确定分类：
+根据2.4步的绘图结果，自己选择合适的分类参数k来确定分类结果，并对分类结果加以探讨。
+#使用rect.hclust(tree, k = NULL, which = NULL, x = NULL, h = NULL,border =2, cluster = NULL)来确定类的个数。 tree就是求出来的对象。k为分类的个数，h为类间距离的阈值。border是画出来的颜色，用来分类的
+png("lec12_gds4794_clustering_tree_plot2.png", width=600,height=300)
+plot(hc)
+rect.hclust(hc,k=2)
+dev.off()
+result=cutree(hc,k=3) #该函数可以用来提取每个样本的所属类别
+result
+
+12.非参数统计分析
+1、Wilcoxon符号秩和检验
+1.1、配对设计资料的符号秩和检验
+1.1.1、数据描述：
+某研究人员使用中药舒心散治疗21例冠心病患者，分别于治疗前和治疗后1个月检测优球蛋白（ELT）。
+1.1.2、数据读取：
+dir="D:/RFile/实验十二"
+setwd(dir)
+file="e12-data-1-1.txt"
+data<-read.table(file,head=T,sep="\t")
+data
+x<-data[,2];y<-data[,3]
+1.1.3、数据可视化观察：
+png("e12_data-1-1_boxplot.png")
+boxplot(data[,2:3])
+dev.off()
+1.1.4、正态性检验：
+shapiro.test(x)
+shapiro.test(y)
+1.1.5、方差齐性检验：
+data2<-data.frame(X<-c(data[,2],data[,3]),A<-factor(rep(1:2,c(21,21))))
+#Bartlett检验 - 如果我们的数据服从正态分布，那么这种方法将是最为适用的。对于正态分布的数据，这种检验极为灵敏；而当数据为非正态分布时，使用该方法则很容易导致假阳性误判。
+bartlett.test(data[,2:3])
+#或bartlett.test(X~A,data=data2)
+#Levene检验 – 相较于Bartlett检验，这一方法更为稳健，这一方法被封装于car程序包中。
+library(car)
+leveneTest(X~A,data=data2)
+#Fligner-Killeen检验 – 这是一个非参数的检验方法，完全不依赖于对分布的假
+设
+fligner.test(X~A,data=data2)
+1.1.6、Wilcoxon配对符号秩和检验（双侧）：
+#H0:Md=0，H1:Md≠0
+wilcox.test(x, y, paired = TRUE, alternative = "two.sided")
+1.1.7、配对t检验（等方差双侧检验）：
+#H0:μ1=μ2, H1: μ1≠μ2
+t.test(x,y, paired = TRUE, var.equal=TRUE, alternative = "two.sided")
+1.1.8、配对t'检验（异方差双侧检验-Welch t检验）：
+#H0:μ1=μ2, H1: μ1≠μ2
+t.test(x,y, paired = TRUE, alternative = "two.sided")
+1.1.9、综合上述统计计算结果，进行对比分析讨论。
+2、Kruskal-Wallis H检验
+2.1、完全随机设计多个独立样本的秩和检验【计量资料】
+2.1.1、数据描述：
+某研究组欲研究A、B两个菌种对小鼠巨噬细胞功能的激活作用，将57只小鼠随机分为三组，其中一组为生理盐水对照组，用常规巨噬细胞吞噬功能的检测方法，获得三组的吞噬指数。
+2.1.2、数据读取：
+dir="D:/RFile/实验十二"
+setwd(dir)
+file="e12-data-2-1.txt"
+data<-read.table(file,head=T,sep="\t")
+data
+2.1.3、数据可视化观察：
+png("e12_data-2-1_boxplot.png")
+boxplot(data[,2:3])
+dev.off()
+2.1.4、正态性检验：
+shapiro.test(data[,1])
+shapiro.test(data[,2])
+shapiro.test(data[,3])
+2.1.5、方差齐性检验：
+data2<-data.frame(X<-c(data[,1],data[,2],data[,3]),A<-
+factor(rep(1:3,c(24,24,24))))
+bartlett.test(data)
+library(car)
+leveneTest(X~A,data=data2)
+fligner.test(X~A,data=data2)
+2.1.6、Kruskal-Wallis检验：
+install.packages("agricolae")
+library( agricolae)
+#H0:M1=M2=M3, H1:三者不等
+kruskal.test(X~A,data=data2)
+2.1.7、单因素方差分析：
+m<-aov(X~A,data=data2)
+summary(m)
+2.1.8、多重比较：
+mm<-TukeyHSD(m)
+mm
+png("e12_data-2-1_TurkeyHSD_plot.png")
+plot(mm)
+dev.off()
+2.1.9、综合上述统计计算结果，进行对比分析讨论。
+3、随机区组设计资料（多组）的秩和检验-Friedman检验
+3.1、数据描述：
+在某项实验中，9名受试对象对四种不同频率声音刺激的反应率（%）结果。
+3.2、数据读取：
+dir="D:/RFile/实验十二"
+setwd(dir)
+file="e12-data-3-1-win.txt"
+data<-read.table(file,head=T,sep="\t")
+data
+3.3、数据可视化观察：
+png("e12_data-3-1_boxplot.png")
+boxplot(data[,2:5])
+dev.off()
+3.4、正态性检验：
+apply(data[,2:5],2,shapiro.test)
+3.5、方差齐性检验：
+data2<-data.frame(X<-c(data[,2],data[,3],data[,4],data[,5]), A<-factor(rep(1:4,rep(9,4))))
+bartlett.test(data[,2:5])
+library(car)
+leveneTest(X~A,data=data2)
+fligner.test(X~A,data=data2)
+3.6、Friedman检验：
+dm<-as.matrix(data[,2:5])
+dimnames(dm) <- list(1:9, c("A", "B", "C", "D"))
+friedman.test(dm)
+3.7、单因素方差分析：
+m<-aov(X~A,data=data2)
+summary(m)
+3.8、多重比较：
+mm<-TukeyHSD(m)
+mm
+png("e12_data-3-1_TurkeyHSD_plot.png")
+plot(mm)
+dev.off()
+
+9.多元线性回归分析
+1、以“Healthy_Breakfast”的数据为例，进行多元回归分析（不考虑哑变量）：
+以rating作为因变量，其他数值型数据列作为自变量，进行多元回归分析，分析过程的R语言代码参考理论授课环节的PPT。具体过程如下：
+1.1、读取数据表；
+dir="D:/RFile/实验九"
+setwd(dir) # 设定工作目录
+file="Data_Healthy_Breakfast.txt"
+data<-read.table(file,head=TRUE,sep="\t")
+#查看数据信息
+head(data)
+ncol(data)
+nrow(data)
+1.2、两两组合绘制散点图和拟合曲线，从总体上看看不同变量之间的关联：
+png("lec10_Healthy_Breakfast_pairs.png")
+pairs(data[,4:16],panel=panel.smooth)
+dev.off()
+1.3、以“rating”数据列为因变量(y),对其他所有数据列进行多元回归分析，并查看分析结果；
+lm0<-lm(rating~.,data=data[,4:16])
+summary(lm0)
+1.4、以【向后】逐步回归法计算最终多元回归模型（记录逐步回归的结果），并查看分析结果（summary）,并根据分析结果，写出相应的多元线性方程；
+lm.step<-step(lm0,direction="backward")
+summary(lm.step)
+1.5、查看回归结果的统计图谱，通过这四张统计图来讨论回归结果的可靠性；
+png(file = "lec10_Healthy_Breakfast_lm_data.png")
+par(mfrow=c(2,2)) #同一个图形文件中绘制2*2=4个图像
+plot(lm.step)
+dev.off()
+1.6、多重共线性分析：
+理想中的线性模型各个自变量应该是线性无关的，若自变量间存在共线
+性，则会降低回归系数的准确性。一般用方差膨胀因子
+VIF(Variance Inflation Factor)来衡量共线性，《统计学习》中认为VIF超过5或10就存在共线性，《R语言实战》中认为VIF大于4则存在共线性。理想中的线性模型VIF=1，表完全不存在共线性。
+library(car)
+vif(lm.step)
+1.7、检查离群点、高杠杆点、强影响点，保存屏幕反馈结果（如果有的话）和统计图：纵坐标超过+2或小于-2的点可被认为是离群点，水平轴超过0.2或0.3的就是高杠杆值（通常为预测值的组合）。圆圈大小与影响成比例，圆圈很大的点可能是对模型参数的估计造成的不成比例影响的强影响点。
+#car包里influencePlot()函数能一次性同时检查离群点、高杠杆点、强影响点
+png("lec10_Healthy_Breakfast_influencePlot.png")
+influencePlot(lm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+2、以“Healthy_Breakfast”的数据为例，进行多元回归分析（考虑哑变量）：
+2.1、将该数据表的第2(mfr)和3(type)两列数据，转换为哑变量（Proxy and dummy variables），与4：16列重新组合成一个新的数据表；
+table(data[,2]) #查看第2列数据种类
+table(data[,3]) #查看第3列数据种类
+data2<-data.frame(matrix(NA,77,20))
+for(i in 1:nrow(data))
+{
+#第二列mfr分类
+if(data[i,2]=="A"){data2[i,1:6]<-c(0,0,0,0,0,0)}
+if(data[i,2]=="G"){data2[i,1:6]<-c(1,0,0,0,0,0)}
+if(data[i,2]=="K"){data2[i,1:6]<-c(0,1,0,0,0,0)}
+if(data[i,2]=="N"){data2[i,1:6]<-c(0,0,1,0,0,0)}
+if(data[i,2]=="P"){data2[i,1:6]<-c(0,0,0,1,0,0)}
+if(data[i,2]=="Q"){data2[i,1:6]<-c(0,0,0,0,1,0)}
+if(data[i,2]=="R"){data2[i,1:6]<-c(0,0,0,0,0,1)}
+#第三列type分类
+if(data[i,3]=="C"){data2[i,7]<-0}
+if(data[i,3]=="H"){data2[i,7]<-1}
+}
+data2[,8:20]<-data[,4:16]
+2.2、将原数据表的第一列数据作为新数据表的行标题，列标题作为新数据表相应列的列标题：
+rownames(data2)<- data[,1]
+colnames(data2)<- c(paste("mfr_",c("G","K","N","P","Q","R"),sep=""),"type_CH",colnames(data)[4:16])
+head(data2)
+2.3、将所有数据列两两组合绘制散点图和拟合曲线，看看不同数据列之间的关
+联：
+png("lec10_Healthy_Breakfast_pairs2.png")
+pairs(data2,panel=panel.smooth)
+dev.off()
+2.4、以“rating”数据列为因变量(y),对其他所有数据列进行多元回归分析，并查看分析结果；
+lm0<-lm(rating~.,data=data2)
+summary(lm0)
+2.5、以【向后】逐步回归法计算最终多元回归模型（记录逐步回归的结果），并查看分析结果（summary）,并根据分析结果，写出相应的多元线性方程；
+lm.step<-step(lm0,direction="backward")
+summary(lm.step)
+2.6、查看回归结果的统计图谱：
+png(file = "lec10_Healthy_Breakfast_lm_data2.png")
+par(mfrow=c(2,2)) #同一个图形文件中绘制2*2=4个图像
+plot(lm.step)
+dev.off()
+2.7、多重共线性分析：
+vif(lm.step)
+2.8、检查离群点、高杠杆点、强影响点，保存屏幕反馈结果（如果有的话）和统计图：
+png("lec10_Healthy_Breakfast_influencePlot2.png")
+influencePlot(lm.step,id.method = "identity", main="Influence Plot",sub="Circle size is proportional to Cook's distance")
+dev.off()
+
+8.多因素方差分析和协方差分析
+1、基因表达谱数据中的双因素方差分析
+根据教师提供的基因表达谱数据（GDS6100），进行双因素方差分析；该数据表中一共涉及两种不同的因素，分别是protocol和time。
+1.1、从该基因表达谱数据表中随机抽取一行数据x，注意行列转换问题；
+dir="D:/RFile/实验八"
+setwd(dir)
+library(GEOquery)
+gds6100 <- getGEO("GDS6100",destdir=dir)
+#查看数据类型
+mode(gds6100)
+#查看注释信息
+Meta(gds6100)
+#查看列注释信息=》用来确定哪些列是肿瘤，哪些列是正常对照
+Columns(gds6100)
+#提取数据
+data<-Table(gds6100)
+#查看数据表的列名
+colnames(data)
+#查看数据表行列数
+ncol(data)
+nrow(data)
+#前面两列是标题列，分别为探针id和基因名称
+#3：8列是 miRNA135b transfected，9：14列是 scambled transfected
+rownames(data)<-data[,1]
+#随机抽取至少1列数据
+n=1
+#按行随机抽样
+row.names<-rownames(data)
+sam.row.name <- sample(row.names,n,replace=F)
+sam.row.name
+1.2、为该行数据设定两个因子，因素A为protocol、因素B为time，两个因素的
+具体信息使用
+Columns函数查看；
+ge<-data.frame(x<-t(data[sam.row.name,3:14]), A<-factor(substring(Columns(gds6100)$protocol,1,9)), B<-factor(substring(Columns(gds6100)$time,6)))
+ge
+1.3、对数据x进行正态性检验（shapiro.test函数）；
+#正态性检验
+shapiro.test(x)
+1.4、分别对数据x和因素A、B之间进行方差齐性检验（bartlett.test函数）；
+#方差齐性检验
+bartlett.test(x~A,data=ge)
+bartlett.test(x~B,data=ge)
+1.5、绘制直方图（plot函数）和交互作用图（interaction.plot），查看数据分布规律；
+#绘图查看数据分布规律
+par(mfrow=c(2,2),las=2, cex.axis=1.2, cex.lab=1.2)
+plot(x~A+B,data=ge)
+interaction.plot(A,B,x,legend=F)
+interaction.plot(B,A,x,legend=F)
+1.6、在不考虑交互作用的情况下，进行双因素方差分析（aov函数），并查看统计分析结果摘要（summary函数）；
+#不考虑交互作用
+ge.aov<-aov(x~A+B,data=ge)
+summary(ge.aov)
+1.7、在考虑交互作用的情况下，进行双因素方差分析（aov函数），并查看统计分析结果摘要（summary函数）；
+#考虑交互作用
+ge.aov2<-aov(x~A*B,data=ge)
+summary(ge.aov2)
+1.8、重复1.1~1.7过程，找到以下3种数据行：
+（1）齐方差、双因素方差分析中的所有p>0.1；
+（2）齐方差、F检验，双因素方差分析中的所有p<0.1，但交互作用p>0.1(即无明显交互作用）；
+（3）齐方差、F检验，双因素方差分析中的所有p无要求，但交互作用p<0.1(即有明显交互作用）。
+（4）然后将上述3种数据行的1.5步绘图结果，进行对比分析和讨论。
+
+7.线性回归分析和方差分析
+1、不同基因表达水平之间的线性回归分析
+该环节需要大家提前准备好一个基因表达谱数据，如果没有，则有授课教师提供（gds4794）。
+1.1、加载数据
+加载GEOquery包，读取基因表达谱数据（gds4794）。
+setwd("D:/RFile/实验七")
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+1.2、提取数据表
+从该基因表达谱数据中提取基因表达数据表。
+data<-Table(gds4794)
+rownames(data)<-data[,1]
+row.name = rownames(data)
+1.3、随机抽样
+从该数据表中随机抽取一行数据，记录对应的探针ID和基因名称。
+n = 1
+set.seed(1)
+sam.row.name = sample(row.name,n,replace=F)
+sam.row.name
+a <- unlist(data[sam.row.name,3:67])
+gene_name_a <- as.character(data[sam.row.name,2])
+gene_name_a
+1.5、不同基因表达水平线性回归分析
+遍历整个基因表达谱数据表，利用R语言中的线性回归分析函数，分析其他所有基因表达水平，与1.3步随机抽取的基因表达水平之间的线性回归关系；记录斜率、截距、R2以及F检验的p.value；同时为所有p.value和相关系数值（cor）关联探针ID或基因名称。
+xb = NULL
+xk = NULL
+xr = NULL
+xp = NULL
+for(i in 1:nrow(data)){
+if(data[i,1] != sam.row.name){
+b <- unlist(data[i,3:67])
+lm.sol <- lm(b~1+a)
+suma <- summary(lm.sol)
+xb <- c(xb,lm.sol$coefficients[1])
+xk <- c(xk,lm.sol$coefficients[2])
+xr <- c(xr,suma$r.squared)
+pv <- 1-pf(suma$fstatistic[1],suma$fstatistic[2],suma$fstatistic[3])
+xp <- c(xp,pv)
+}
+}
+names(xb)<-data[-which(data$ID_REF==sam.row.name),1]
+names(xk)<-data[-which(data$ID_REF==sam.row.name),1]
+names(xr)<-data[-which(data$ID_REF==sam.row.name),1]
+names(xp)<-data[-which(data$ID_REF==sam.row.name),1]
+1.6、高相关性基因筛选
+设定p.value（至少小于0.05）和相关系数R2的筛选阈值（至少大于0.25）；对1.5步计算结果进行筛选，保留符合条件的基因；对符合条件的p.value和相关系数r所关联的基因名称进行交集运算；查看交集运算结果中是否存在非法基因信息，如果有去除它；筛选高相关性基因的斜率和截距数据。
+p_value = 0.01
+r_cutoff = 0.65
+xp2 <- xp[xp<p_value]
+xr2 <- xr[xr>r_cutoff]
+genes <- intersect(names(xp2),names(xr2))
+length(genes)
+2、不同基因表达水平之间的单因素方差分析
+把与所选基因表达水平相关性最高的那个基因表达数据提取出来；
+两个基因的表达水平进行线性回归分析；
+maxgene = unlist(data[which(data$ID_REF=="1556761_at"),3:67])
+re_lm.sol = lm(maxgene~1+a)
+summary(re_lm.sol)
+绘制评价回归分析结果中的四张图片；
+png(file = "plot.png")
+par(mfrow=c(2,2))
+plot(re_lm.sol)
+dev.off()
+绘制表达水平的散点图和回归方程；
+png(file = "plot2.png")
+plot(a,maxgene,lwd=2,main="plot2")
+y_mean=mean(maxgene)
+abline(h=y_mean,col="blue")
+x_mean=mean(a)
+abline(v=x_mean,col="purple")
+abline(re_lm.sol,col="red")
+dev.off()
+单因素方差分析。
+aov(a~maxgene)
+summary(aov(a~maxgene))
+
+6.Pearson相关分析
+1、不同基因表达水平之间相关性的分析
+该环节需要大家提前准备好一个基因表达谱数据，如果没有，则有授课教师提供（gds4794）。
+1.1、加载数据
+加载GEOquery包，读取基因表达谱数据（gds4794）。
+setwd("D:/RFile/实验六")
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+1.2、提取数据表
+从该基因表达谱数据中提取基因表达数据表。
+data<-Table(gds4794)
+rownames(data)<-data[,1]
+row.name = rownames(data)
+1.3、随机抽样
+从该数据表中随机抽取一行数据，记录对应的探针ID和基因名称。
+n = 1
+set.seed(1)
+sam.row.name = sample(row.name,n,replace=F)
+sam.row.name
+a <- unlist(data[sam.row.name,3:67])
+gene_name_a <- as.character(data[sam.row.name,2])
+gene_name_a
+1.5、不同基因表达水平Pearson相关系数计算
+遍历整个基因表达谱数据表，利用R语言中的Pearson相关系数检验函数，分析其他所有基因表达水平，与1.3步随机抽取的基因表达水平之间的相关性；记录p.value和相关系数值（cor）；同时为所有p.value和相关系数值（cor）关联基因名称。
+p = NULL
+r = NULL
+for(i in 1:nrow(data)){
+b <- unlist(data[i,3:67])
+x <- cor.test(a,b, method="pearson")
+p <- c(p,x$p.value)
+r <- c(r,x$estimate)
+}
+names(p)<-data[,2]
+names(r)<-data[,2]
+1.6、高相关性基因筛选
+设定p.value（至少小于0.05）和相关系数r的筛选阈值（至少大于0.5）；对1.5步计算结果进行筛选，保留符合条件的基因；对符合条件的p.value和相关系数r所关联的基因名称进行交集运算；查看交集运算结果中是否存在非法基因信息，如果有去除它。
+p_value = 0.01
+r_cutoff = 0.6
+p2 <- p[p<p_value]
+r2 <- r[r>r_cutoff]
+length(p2)
+length(r2)
+genes <- intersect(names(p2),names(r2))
+genes[-match("ARHGAP26",genes)]
+length(genes)
+tail(genes)
+genes2 <-c(gene_name_a,genes[1:645])
+out = "pearson-related-genes.txt"
+write.table(genes2,out)
+1.7、高相关性基因生物学意义的探讨
+为什么有些基因的表达与你所选择的基因表达水平之间存在较高的相关性？
+
+5.t检验
+1、等方差和异方差t检验的比较
+1.1、随机生成两组、每组100个0~100之间的数值，然后分别进行等方差和异方差t检验；
+代码：
+#随机数生成
+set.seed(1)
+a<-seq(0,100,length.out=100)
+set.seed(2)
+b<-seq(0,100,length.out=100)
+#t检验
+t.test(a,b,var.equal=TRUE) #等方差t检验
+t.test(a,b) #异方差t检验
+#概率密度分布图
+#a
+png(file = "t_test.png")
+curve(dnorm(x,mean(a,na.rm=TRUE),sd(a,na.rm=TRUE)),xlim=c(0,100),ylim=c(0,0.04),col="blue",lwd=3)
+abline(v=mean(a,na.rm=TRUE),lty=3,lwd=3,col="blue") # 增加均值线
+abline(v=mean(a,na.rm=TRUE)+sd(a,na.rm=TRUE),lty=3,lwd=3,col="blue") # 增加标准差线
+abline(v=mean(a,na.rm=TRUE)-sd(a,na.rm=TRUE),lty=3,lwd=3,col="blue") # 增加标准差线
+#b
+curve(dnorm(x,mean(b,na.rm=TRUE),sd(b,na.rm=TRUE)),add=TRUE,xlim=c(0,100),ylim=c(0,0.04),col="red",lwd=3)
+abline(v=mean(b,na.rm=TRUE),lty=3,lwd=3,col="red") # 增加均值线
+abline(v=mean(b,na.rm=TRUE)+sd(b,na.rm=TRUE),lty=3,lwd=3,col="red") # 增加标准差线
+abline(v=mean(b,na.rm=TRUE)-sd(b,na.rm=TRUE),lty=3,lwd=3,col="red") # 增加标准差线
+dev.off()
+1.2、随机生成两组0~100之间的数值（seq函数），第一组100个数值，第二组50个数值，然后分别进行等方差和异方差t检验；
+将1.1中的b<-seq(0,100,length.out=100)改为b<-seq(0,100,length.out=50)即可
+1.3、 随机生成两组、每组100个的数值，第一组60~90之间，第二组70~80之间，然后分别进行等方差和异方差t检验；
+将1.1中的a<-seq(0,100,length.out=100)改为a<-seq(60,90,length.out=100)
+将1.1中的b<-seq(0,100,length.out=100)改为b<-seq(70,80,length.out=100)即可
+1.4、 随机生成两组、每组100个的数值，第一组50~80之间，第二组70~100之间，然后分别进行等方差和异方差t检验；
+将1.1中的a<-seq(0,100,length.out=100)改为a<-seq(50,80,length.out=100)
+将1.1中的b<-seq(0,100,length.out=100)改为b<-seq(70,100,length.out=100)即可
+1.5、对上述统计分析结果进行分析讨论。
+2、t检验在基因表达水平分析中的应用
+2.1、加载数据
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+2.2、查看样本信息
+#查看样本数量
+Meta(gds4794)$sample_count
+#查看列注释信息
+Columns(gds4794)
+2.3、提取数据表
+data<-Table(gds4794)
+head(data)
+#查看数据表的行、列数
+ncol(data)
+nrow(data)
+#肿瘤数据
+tumor<-data[,3:25]
+#正常组织数据
+normal<-data[,26:67]
+#data第1列设定为tumor和normal行标题
+rownames(tumor)<-data[,1]
+rownames(normal)<-data[,1]
+2.4、随机抽样
+#随机抽取1行数据
+n=1
+#按行随机抽样
+row.name = rownames(tumor)
+sam.row.name = sample(row.name,n,replace=F)
+sam.row.name #查看抽中的数据行【某个基因在不同样本中的表达水平】
+tumor_expression_level <- tumor[sam.row.name,]
+normal_expression_level <- normal[sam.row.name,]
+2.5、数据类型转换
+a<-unlist(tumor_expression_level)
+b<-unlist(normal_expression_level)
+2.6、计算均值和方差
+#计算均值和方差
+a_average<-mean(a,na.rm=TRUE)
+a_sd<-sd(a,na.rm=TRUE)
+b_average<-mean(b,na.rm=TRUE)
+b_sd<-sd(b,na.rm=TRUE)
+#查看结果
+a_average
+a_sd
+b_average
+b_sd
+2.7、等方差和异方差t检验的比较
+t.test(a,b,var.equal=TRUE) #等方差t检验
+t.test(a,b) #异方差t检验
+2.8、统计绘图
+#概率密度分布图【结果纪录】
+x1=min(a,b)
+x2=max(a,b)
+y1=0
+y2=0.0002
+#a
+png(file = "t_test_1DEG.png")
+curve(dnorm(x,mean(a,na.rm=TRUE), sd(a,na.rm=TRUE)), xlim=c(x1,x2),ylim=c(y1,y2), col="blue", lwd=3)
+abline(v=a_average,lty=3, lwd=3, col="blue") # 增加均值线
+abline(v=a_average+a_sd, lty=3, lwd=3, col="blue") # 增加标准差线
+abline(v=a_average-a_sd, lty=3, lwd=3, col="blue") # 增加标准差线
+#b
+curve(dnorm(x,mean(b,na.rm=TRUE), sd(b,na.rm=TRUE)), add=TRUE, xlim=c(0,100),ylim=c(0,0.0002), col="red", lwd=3)
+abline(v=b_average, lty=3, lwd=3, col="red") # 增加均值线
+abline(v=b_average+b_sd, lty=3, lwd=3, col="red") # 增加标准差线
+abline(v=b_average-b_sd, lty=3, lwd=3, col="red") # 增加标准差线
+dev.off()
+
+4.分类数据分析
+#等位基因频率的Kappa一致性测量
+x<-cbind(c(115,103),c(121,180))
+x #查看回显
+#加载vcd 库
+library(vcd)
+Kappa(x)
+#基因型频率的Kappa一致性测量
+y<-cbind(c(17,197,4),c(48,146,107))
+Kappa(y)
+3、卡方检验：
+3.1、卡方独立性检验/等比例检验：
+对上表的等位基因频率和基因型频率进行卡方独立性检验分析：
+chisq.test(x,correct=F)
+chisq.test(y,correct=F)
+3.2、卡方拟合优先度检验：
+对上表的等位基因频率和基因型频率进行卡方拟合优先度检验分析：
+x<-c(121,180)
+px<-c(52.9,47.1)
+chisq.test(x, p = px, rescale.p = TRUE)
+y<-c(48,146,107)
+py<-c(7.8,90.4,1.8)
+chisq.test(y, p = py, rescale.p = TRUE)
+3.3、对Kappay一致性测量分析结果，以及这两种检验分析结果进行对比分析；
+4、卡方检验2:
+该环节需要大家提前准备好一个基因表达谱数据，如果没有，则有授课教师提供。以下示例以教师提供的一个来自于Genbank的GEO Datasets数据的GDS-format数据进行分析的。
+4.1、加载数据
+library(GEOquery)
+gds4794 <- getGEO(filename='GDS4794.soft.gz')
+4.2、提取数据表
+#从数据类中提取所需数据表
+data<-Table(gds4794)
+#查看数据表的行、列数
+ncol(data)
+nrow(data)
+#去除标题列的干扰【前两列】
+data2<-data[,3:67]
+#随机抽取2列数据
+n=2
+#得到列名称【标题行】
+col.name=colnames(data2)
+#按列随机抽样
+sam.col.name = sample(col.name,n,replace=F)
+#查看抽样结果
+sam.col.name
+#提取子数据集
+sub.data <- data2[, sam.col.name]
+4.3、频数统计：
+# 把sub.data 从大到小分成 10 个区间进行频数统计
+freq = matrix(rep(0,20),10,2) # 初始化频数矩阵
+for(i in 1:2){
+x <-table(as.numeric(cut(sub.data[,i],10)))
+y <- as.data.frame(x)
+freq[,i] <- y[,2]
+}
+colnames(freq)<-colnames(sub.data) # 列名
+#卡方独立性检验/等比例检验：
+chisq.test(freq,correct=F)
+#卡方拟合优先度检验
+x<- freq[,1]
+p<-freq[,2]/sum(freq[,2])
+chisq.test(x, p = p, rescale.p = TRUE)
